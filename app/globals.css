@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* Clerk shadcn theme — makes Clerk components inherit shadcn/ui design tokens */
-@import "@clerk/ui/themes/shadcn.css";
 
 @custom-variant dark (&:is(.dark *));
 
