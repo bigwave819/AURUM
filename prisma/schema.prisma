@@ -84,7 +84,6 @@ model Verification {
 model Brand {
   id          String   @id @default(cuid())
   name        String   @unique
-  logoUrl     String?
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
