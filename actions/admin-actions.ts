@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { watchSchema } from "@/lib/schemas/watch-schema"
+import { cloudinary } from "@/lib/cloudinary"
 
 interface GetUsersParams {
   page?: number;
@@ -21,6 +23,13 @@ interface GetBrandsParams {
   limit?: number;
 }
 
+interface GetWatchesParams {
+  page?: number;
+  limit?: number;
+  brandId?: string;
+}
+
+
 async function requireAdmin() {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -31,6 +40,12 @@ async function requireAdmin() {
   }
 
   return session;
+}
+
+function extractPublicId(url: string) {
+  // e.g. .../aurum/watches/abc123.jpg -> aurum/watches/abc123
+  const match = url.match(/\/aurum\/watches\/([^./]+)/);
+  return match ? `aurum/watches/${match[1]}` : null;
 }
 
 export async function getAllUsers({ page = 1, limit = 10 }: GetUsersParams = {}) {
@@ -251,5 +266,156 @@ export async function deleteBrand(id: string) {
       success: false as const,
       error: "Something went wrong while deleting the brand.",
     };
+  }
+}
+
+export async function getAllWatches({ page = 1, limit = 10, brandId }: GetWatchesParams = {}) {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const skip = (safePage - 1) * safeLimit;
+
+  try {
+    const where = brandId ? { brandId } : {};
+
+    const [watches, totalCount] = await Promise.all([
+      prisma.watch.findMany({
+        where,
+        skip,
+        take: safeLimit,
+        orderBy: { createdAt: "desc" },
+        include: { brand: { select: { id: true, name: true } } },
+      }),
+      prisma.watch.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / safeLimit);
+
+    return {
+      success: true as const,
+      data: watches,
+      pagination: {
+        currentPage: safePage,
+        limit: safeLimit,
+        totalCount,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to fetch watches:", error);
+    return { success: false as const, error: "Something went wrong while fetching watches." };
+  }
+}
+
+export async function createWatch(input: unknown) {
+  await requireAdmin();
+
+  const parsed = watchSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false as const, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  try {
+    const watch = await prisma.watch.create({ data: parsed.data });
+    revalidatePath("/admin/watches");
+    return { success: true as const, data: watch };
+  } catch (error: any) {
+    if (error.code === "P2003") {
+      return { success: false as const, error: "Selected brand doesn't exist." };
+    }
+    console.error("Failed to create watch:", error);
+    return { success: false as const, error: "Something went wrong while creating the watch." };
+  }
+}
+
+export async function updateWatch(id: string, input: unknown) {
+  await requireAdmin();
+
+  const parsed = watchSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false as const, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  try {
+    const existing = await prisma.watch.findUnique({ where: { id }, select: { image: true } });
+
+    const watch = await prisma.watch.update({ where: { id }, data: parsed.data });
+
+    // If the image changed, clean up the old Cloudinary asset
+    if (existing && existing.image !== parsed.data.image) {
+      const publicId = extractPublicId(existing.image);
+      if (publicId) {
+        cloudinary.uploader.destroy(publicId).catch((err) =>
+          console.error("Failed to delete old Cloudinary image:", err)
+        );
+      }
+    }
+
+    revalidatePath("/admin/watches");
+    return { success: true as const, data: watch };
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return { success: false as const, error: "Watch not found." };
+    }
+    if (error.code === "P2003") {
+      return { success: false as const, error: "Selected brand doesn't exist." };
+    }
+    console.error("Failed to update watch:", error);
+    return { success: false as const, error: "Something went wrong while updating the watch." };
+  }
+}
+
+export async function deleteWatch(id: string) {
+  await requireAdmin();
+
+  try {
+    const watch = await prisma.watch.findUnique({ where: { id }, select: { image: true } });
+
+    await prisma.watch.delete({ where: { id } });
+
+    if (watch) {
+      const publicId = extractPublicId(watch.image);
+      if (publicId) {
+        cloudinary.uploader.destroy(publicId).catch((err) =>
+          console.error("Failed to delete Cloudinary image:", err)
+        );
+      }
+    }
+
+    revalidatePath("/admin/watches");
+    return { success: true as const };
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return { success: false as const, error: "Watch not found." };
+    }
+    if (error.code === "P2003") {
+      return { success: false as const, error: "Can't delete — this watch has existing orders." };
+    }
+    console.error("Failed to delete watch:", error);
+    return { success: false as const, error: "Something went wrong while deleting the watch." };
+  }
+}
+
+
+export async function updateProfile(input: unknown) {
+  const session = await requireAdmin();
+
+  const parsed = profileSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false as const, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: session.user.id },
+      data: parsed.data,
+    });
+
+    revalidatePath("/admin/settings");
+    return { success: true as const, data: user };
+  } catch (error) {
+    console.error("Failed to update profile:", error);
+    return { success: false as const, error: "Something went wrong while updating your profile." };
   }
 }

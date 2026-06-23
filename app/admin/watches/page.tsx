@@ -1,38 +1,60 @@
+// app/admin/watches/page.tsx
+import { getAllWatches } from "@/actions/admin-actions";
 import { getAllBrands } from "@/actions/admin-actions";
-import AddWatchModal from "@/components/admin/watches/Add-watch-modal";
-import { Button } from "@/components/ui/button";
+import { WatchesTable } from "@/components/admin/watches/watches-table";
+import { WatchesPagination } from "@/components/admin/watches/watches-pagination";
+import { CreateWatchDialog } from "@/components/admin/watches/create-watch-dialog";
 
-interface BrandsPageProps {
-    searchParams: Promise<{ page?: string }>;
+interface WatchesPageProps {
+  searchParams: Promise<{ page?: string }>;
 }
 
-async function WatchPage({ searchParams }: BrandsPageProps) {
-    const params = await searchParams;
-    const page = Number(params.page) || 1;
+export default async function WatchesPage({ searchParams }: WatchesPageProps) {
+  const params = await searchParams;
+  const page = Number(params.page) || 1;
 
-    const result = await getAllBrands({ page, limit: 10 });
+  const [watchesResult, brandsResult] = await Promise.all([
+    getAllWatches({ page, limit: 10 }),
+    getAllBrands({ limit: 100 }),
+  ]);
 
-    if (!result.success || !result.data) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-                <p className="text-sm font-medium" style={{ color: "#3A2F22" }}>
-                    Couldn't load brands
-                </p>
-                <p className="text-xs mt-1" style={{ color: "#9E9185" }}>
-                    {result.error ?? "Something went wrong while fetching brands."}
-                </p>
-            </div>
-        );
-    }
-
+  if (!watchesResult.success || !watchesResult.data) {
     return (
-        <div>
-            <div></div>
-            <div>
-                <AddWatchModal brands={result.data} />
-            </div>
-        </div>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-sm font-medium" style={{ color: "#3A2F22" }}>
+          Couldn't load watches
+        </p>
+        <p className="text-xs mt-1" style={{ color: "#9E9185" }}>
+          {watchesResult.error ?? "Something went wrong while fetching watches."}
+        </p>
+      </div>
     );
-}
+  }
 
-export default WatchPage;
+  const brands = brandsResult.success ? brandsResult.data!.map((b) => ({ id: b.id, name: b.name })) : [];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-medium" style={{ color: "#3A2F22" }}>
+            Watches
+          </h1>
+          <p className="text-sm mt-1" style={{ color: "#9E9185" }}>
+            {watchesResult.pagination.totalCount} total
+          </p>
+        </div>
+        <CreateWatchDialog brands={brands} />
+      </div>
+
+      <WatchesTable watches={watchesResult.data} brands={brands} />
+
+      <WatchesPagination
+        currentPage={watchesResult.pagination.currentPage}
+        totalPages={watchesResult.pagination.totalPages}
+        hasNextPage={watchesResult.pagination.hasNextPage}
+        hasPrevPage={watchesResult.pagination.hasPrevPage}
+      />
+    </div>
+  );
+}

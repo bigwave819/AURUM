@@ -1,35 +1,29 @@
-import { v2 as cloudinary } from 'cloudinary'
-import { NextResponse } from 'next/server'
+// app/api/cloudinary/sign/route.ts
+import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
+import { cloudinary } from "@/lib/cloudinary";
 
-cloudinary.config({ 
-  cloud_name: process.env.CLOUDINARY_NAME, 
-  api_key: process.env.CLOUDINARY_API_KEY, 
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+export async function POST() {
+  const session = await auth.api.getSession({ headers: await headers() });
 
-export async function POST(request: Request) {
-    try {
-        const { timestamp } = await request.json();
-        const signature = cloudinary.utils.api_sign_request(
-            {
-                timestamp,
-                folder: 'car-rental-rwanda'
-            },
-            process.env.CLOUDINARY_API_SECRET  as string
-        );
+  if (!session?.user || (session.user as any).role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
 
-        return NextResponse.json({
-            signature,
-            timestamp,
-            apiKey : process.env.CLOUDINARY_API_KEY
-        })
-    } catch (error) {
-        console.error('error while generating Cloudinary signature');
-        return NextResponse.json(
-            {
-                error: "failed to generate the signature"
-            },
-            { status: 500 }
-        )        
-    }
+  const timestamp = Math.round(Date.now() / 1000);
+  const folder = "aurum/watches";
+
+  const signature = cloudinary.utils.api_sign_request(
+    { timestamp, folder },
+    process.env.CLOUDINARY_API_SECRET!
+  );
+
+  return NextResponse.json({
+    timestamp,
+    signature,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    folder,
+  });
 }
