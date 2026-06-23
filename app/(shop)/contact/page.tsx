@@ -1,11 +1,6 @@
+// app/contact/page.tsx
+import ContactContent from "@/components/contact/contact-content";
 
-
-function ContactPage() {
-    return ( 
-        <div>
-            <h2>Contact page</h2>
-        </div>
-     );
+export default function ContactPage() {
+  return <ContactContent />;
 }
-
-export default ContactPage;
