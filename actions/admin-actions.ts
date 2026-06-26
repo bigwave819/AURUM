@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { watchSchema } from "@/lib/schemas/watch-schema"
 import { cloudinary } from "@/lib/cloudinary"
+import { profileSchema } from "@/lib/schemas/settings-schema";
 
 interface GetUsersParams {
   page?: number;
