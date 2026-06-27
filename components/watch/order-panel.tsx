@@ -2,46 +2,42 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Minus, Plus } from "lucide-react";
-import { createOrder } from "@/actions/user-actions";
-import { useSession } from "@/lib/auth-client";
+import { Minus, Plus, ShoppingBag } from "lucide-react";
+import { useCartStore } from "@/store/cart-store";
 
 interface OrderPanelProps {
-  watchId: string;
-  price: number;
+  watch: {
+    id: string;
+    name: string;
+    image: string;
+    price: number;
+    brand: { name: string };
+  };
 }
 
 function formatPrice(price: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "FRW" }).format(price);
 }
 
-export function OrderPanel({ watchId, price }: OrderPanelProps) {
-  const { data: session } = useSession();
-  const router = useRouter();
+export function OrderPanel({ watch }: OrderPanelProps) {
+  const addItem = useCartStore((s) => s.addItem);
   const [quantity, setQuantity] = useState(1);
-  const [loading, setLoading] = useState(false);
 
-  async function handleOrder() {
-    if (!session?.user) {
-      toast.error("Sign in to place an order", {
-        action: { label: "Sign in", onClick: () => router.push("/auth") },
-      });
-      return;
-    }
+  function handleAddToCart() {
+    addItem(
+      {
+        watchId: watch.id,
+        name: watch.name,
+        image: watch.image,
+        price: watch.price,
+        brandName: watch.brand.name,
+      },
+      quantity
+    );
 
-    setLoading(true);
-    const result = await createOrder(watchId, quantity);
-    setLoading(false);
-
-    if (!result.success) {
-      toast.error(result.error ?? "Something went wrong.");
-      return;
-    }
-
-    toast.success("Order placed", {
-      description: `${quantity} × ${formatPrice(price)} — we'll be in touch shortly.`,
+    toast.success("Added to cart", {
+      description: `${quantity} × ${watch.name}`,
     });
     setQuantity(1);
   }
@@ -81,17 +77,13 @@ export function OrderPanel({ watchId, price }: OrderPanelProps) {
       </div>
 
       <button
-        onClick={handleOrder}
-        disabled={loading}
-        className="w-full sm:w-auto px-8 py-3.5 text-[12.5px] tracking-wide uppercase rounded-md transition-opacity disabled:opacity-60"
+        onClick={handleAddToCart}
+        className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 text-[12.5px] tracking-wide uppercase rounded-md transition-opacity hover:opacity-90"
         style={{ backgroundColor: "#745A27", color: "#FFF8F3" }}
       >
-        {loading ? "Placing order…" : `Place order — ${formatPrice(price * quantity)}`}
+        <ShoppingBag size={15} />
+        Add to cart — {formatPrice(watch.price * quantity)}
       </button>
-
-      <p className="text-[11px]" style={{ color: "#B5A088" }}>
-        Our team will contact you to confirm details and arrange payment.
-      </p>
     </div>
   );
 }

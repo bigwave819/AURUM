@@ -19,7 +19,7 @@ interface WatchGridProps {
 }
 
 function formatPrice(price: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "FRW" }).format(price);
 }
 
 const containerVariants: Variants = {
@@ -52,6 +52,7 @@ export function WatchGrid({ watches }: WatchGridProps) {
                 src={watch.image}
                 alt={watch.name}
                 fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
               />
             </div>

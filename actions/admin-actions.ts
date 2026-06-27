@@ -8,10 +8,20 @@ import { z } from "zod";
 import { watchSchema } from "@/lib/schemas/watch-schema"
 import { cloudinary } from "@/lib/cloudinary"
 import { profileSchema } from "@/lib/schemas/settings-schema";
+import { OrderStatus } from "@prisma/client";
 
 interface GetUsersParams {
   page?: number;
   limit?: number;
+}
+
+interface GetOrdersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: OrderStatus | "ALL" ;
+  sortBy?: "createdAt" | "totalAmount";
+  sortOrder?: "asc" | "desc";
 }
 
 const brandSchema = z.object({
@@ -418,5 +428,118 @@ export async function updateProfile(input: unknown) {
   } catch (error) {
     console.error("Failed to update profile:", error);
     return { success: false as const, error: "Something went wrong while updating your profile." };
+  }
+}
+
+export async function getAllOrders({
+  page = 1,
+  limit = 10,
+  search = "",
+  status = "ALL",
+  sortBy = "createdAt",
+  sortOrder = "desc",
+}: GetOrdersParams = {}) {
+  await requireAdmin();
+
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const skip = (safePage - 1) * safeLimit;
+
+  const where: Prisma.OrderWhereInput = {
+    ...(status !== "ALL" ? { status } : {}),
+    ...(search
+      ? {
+          user: {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+            ],
+          },
+        }
+      : {}),
+  };
+
+  try {
+    const [orders, totalCount] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        skip,
+        take: safeLimit,
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          user: { select: { id: true, name: true, email: true, image: true } },
+          items: { select: { id: true } }, // just for item count on the list view
+        },
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / safeLimit);
+
+    return {
+      success: true as const,
+      data: orders,
+      pagination: {
+        currentPage: safePage,
+        totalCount,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to fetch orders:", error);
+    return { success: false as const, error: "Something went wrong while fetching orders." };
+  }
+}
+
+export async function getOrderById(id: string) {
+  await requireAdmin();
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true, image: true } },
+        items: {
+          include: {
+            watch: {
+              select: { id: true, name: true, image: true, brand: { select: { name: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return { success: false as const, error: "Order not found." };
+    }
+
+    return { success: true as const, data: order };
+  } catch (error) {
+    console.error("Failed to fetch order:", error);
+    return { success: false as const, error: "Something went wrong while fetching this order." };
+  }
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus) {
+  await requireAdmin();
+
+  try {
+    const order = await prisma.order.update({
+      where: { id },
+      data: { status },
+    });
+
+    revalidatePath("/admin/orders");
+    revalidatePath(`/admin/orders/${id}`);
+
+    return { success: true as const, data: order };
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return { success: false as const, error: "Order not found." };
+    }
+    console.error("Failed to update order status:", error);
+    return { success: false as const, error: "Something went wrong while updating the order." };
   }
 }

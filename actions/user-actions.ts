@@ -13,6 +13,11 @@ interface GetPublicWatchesParams {
   brandId?: string;
 }
 
+interface OrderInput {
+  watchId: string;
+  quantity: number;
+}
+
 export async function getPublicWatches({
   page = 1,
   limit = 12,
@@ -138,7 +143,62 @@ export async function getRelatedWatches(brandId: string, excludeId: string) {
   }
 }
 
-interface OrderInput {
-  watchId: string;
-  quantity: number;
+export async function createOrderFromCart(items: OrderInput[]) {
+  const session = await auth.api.getSession({ headers: await headers() });
+
+  if (!session?.user) {
+    return { success: false as const, error: "Sign in to place an order.", requiresAuth: true as const };
+  }
+
+  if (!items.length) {
+    return { success: false as const, error: "Your cart is empty." };
+  }
+
+  for (const item of items) {
+    if (item.quantity < 1 || item.quantity > 10) {
+      return { success: false as const, error: "Quantity must be between 1 and 10 for each item." };
+    }
+  }
+
+  try {
+    // Re-fetch current prices server-side — never trust client-sent prices
+    const watchIds = items.map((i) => i.watchId);
+    const watches = await prisma.watch.findMany({
+      where: { id: { in: watchIds } },
+      select: { id: true, price: true, name: true },
+    });
+
+    if (watches.length !== watchIds.length) {
+      return { success: false as const, error: "One or more items in your cart are no longer available." };
+    }
+
+    const watchMap = new Map(watches.map((w) => [w.id, w]));
+
+    const totalAmount = items.reduce((sum, item) => {
+      const watch = watchMap.get(item.watchId)!;
+      return sum + watch.price * item.quantity;
+    }, 0);
+
+    const order = await prisma.order.create({
+      data: {
+        userId: session.user.id,
+        totalAmount,
+        items: {
+          create: items.map((item) => ({
+            watchId: item.watchId,
+            quantity: item.quantity,
+            price: watchMap.get(item.watchId)!.price,
+          })),
+        },
+      },
+      include: { items: true },
+    });
+
+    revalidatePath("/cart");
+
+    return { success: true as const, data: order };
+  } catch (error) {
+    console.error("Failed to create order:", error);
+    return { success: false as const, error: "Something went wrong while placing your order." };
+  }
 }

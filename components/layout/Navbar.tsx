@@ -6,7 +6,7 @@ import { useState } from "react";
 
 
 const links = [
-  { id: 1, name: "Collection", path: "/collection" },
+  { id: 1, name: "Home", path: "/" },
   { id: 2, name: "Watches",    path: "/watch"       },
   { id: 3, name: "Contact",    path: "/contact"     },
 ];
@@ -81,6 +81,7 @@ export default function Navbar() {
             onMouseEnter={e => (e.currentTarget.style.background = "#F0E9DF")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             aria-label="Cart"
+            onClick={() => router.push("/cart")}
           >
             <ShoppingBag size={20} />
           </button>

@@ -21,7 +21,7 @@ interface WatchListProps {
 }
 
 function formatPrice(price: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "FRW" }).format(price);
 }
 
 const containerVariants: Variants = {

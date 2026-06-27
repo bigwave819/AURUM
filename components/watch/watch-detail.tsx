@@ -22,7 +22,7 @@ interface WatchDetailProps {
 }
 
 function formatPrice(price: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "FRW" }).format(price);
 }
 
 export function WatchDetail({ watch }: WatchDetailProps) {
@@ -51,7 +51,14 @@ export function WatchDetail({ watch }: WatchDetailProps) {
           className="relative aspect-square rounded-xl overflow-hidden"
           style={{ backgroundColor: "#F5EDE3" }}
         >
-          <Image src={watch.image} alt={watch.name} fill className="object-cover" priority />
+          <Image 
+            src={watch.image} 
+            alt={watch.name} 
+            fill 
+            sizes="(max-width: 640px) 100vw, 50vw"
+            className="object-cover" 
+            priority 
+          />
         </motion.div>
 
         <motion.div
@@ -78,7 +85,7 @@ export function WatchDetail({ watch }: WatchDetailProps) {
             </p>
           )}
 
-          <OrderPanel watchId={watch.id} price={watch.price} />
+          <OrderPanel watch={watch} />
         </motion.div>
       </div>
     </div>
