@@ -1,14 +1,12 @@
-'use client'
+// app/auth/page.tsx
+"use client";
 import { useState } from "react";
 import { signIn } from "@/lib/auth-client";
 import { AlertCircle, Clock } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-
-  const router = useRouter()
 
   const handleGoogleLogin = async () => {
     if (loading) return;
@@ -17,10 +15,8 @@ export default function AuthPage() {
     try {
       await signIn.social({
         provider: "google",
-        callbackURL: "/",
+        callbackURL: "/auth/redirect",
       });
-
-      router.push('/admin/dashboard')
     } catch (error) {
       console.error(error);
       setFormError("Google sign-in failed. Please try again.");
@@ -29,18 +25,11 @@ export default function AuthPage() {
   };
 
   return (
-    <main
-      className="min-h-screen flex items-center justify-center px-4"
-      // style={{ backgroundColor: "#FFF8F3" }}
-    >
+    <main className="min-h-screen flex items-center justify-center px-4">
       <div
         className="w-full max-w-sm flex flex-col items-center rounded-xl px-9 py-10"
-        style={{
-          background: "white",
-          border: "0.5px solid #E0D5C8",
-        }}
+        style={{ background: "white", border: "0.5px solid #E0D5C8" }}
       >
-        {/* Icon mark */}
         <div
           className="w-12 h-12 flex items-center justify-center rounded-xl mb-5"
           style={{ background: "#F5EDE3", border: "0.5px solid #D4B896" }}
@@ -48,23 +37,15 @@ export default function AuthPage() {
           <Clock size={22} style={{ color: "#745A27" }} />
         </div>
 
-        {/* Wordmark */}
-        <h1
-          className="text-xl font-medium tracking-[0.22em] mb-1"
-          style={{ color: "#745A27" }}
-        >
+        <h1 className="text-xl font-medium tracking-[0.22em] mb-1" style={{ color: "#745A27" }}>
           AURUM
         </h1>
-        <p
-          className="text-[11px] tracking-[0.12em] uppercase mb-8"
-          style={{ color: "#9E9185" }}
-        >
+        <p className="text-[11px] tracking-[0.12em] uppercase mb-8" style={{ color: "#9E9185" }}>
           Management Access Suite
         </p>
 
         <div className="w-full h-px mb-8" style={{ background: "#E8DDD0" }} />
 
-        {/* Heading */}
         <div className="w-full mb-1">
           <h2 className="text-sm font-medium" style={{ color: "#3A2F22" }}>
             Sign in to continue
@@ -76,47 +57,32 @@ export default function AuthPage() {
           </p>
         </div>
 
-        {/* Error */}
         {formError && (
           <div
+            role="alert"
+            aria-live="assertive"
             className="w-full flex items-center gap-2 rounded-lg px-3 py-2 mb-4 text-xs"
-            style={{
-              background: "#FCEBEB",
-              border: "0.5px solid #F09595",
-              color: "#791F1F",
-            }}
+            style={{ background: "#FCEBEB", border: "0.5px solid #F09595", color: "#791F1F" }}
           >
             <AlertCircle size={14} style={{ color: "#A32D2D", flexShrink: 0 }} />
             {formError}
           </div>
         )}
-
-        {/* Google button */}
         <button
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2.5 rounded-lg
-                     text-sm font-medium tracking-wide transition-all duration-200
-                     disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99]"
+          className="w-full flex items-center justify-center gap-2.5 rounded-lg text-sm font-medium tracking-wide transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99]"
           style={{
             padding: "11px 20px",
             border: "0.5px solid #D4B896",
             background: loading ? "#F5EDE3" : "#FFF8F3",
             color: "#3A2F22",
           }}
-          onMouseEnter={e => {
-            if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#F5EDE3";
-          }}
-          onMouseLeave={e => {
-            if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#FFF8F3";
-          }}
+          onMouseEnter={(e) => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#F5EDE3"; }}
+          onMouseLeave={(e) => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#FFF8F3"; }}
         >
           {loading ? (
-            <svg
-              className="animate-spin"
-              width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="#745A27" strokeWidth="2" strokeLinecap="round"
-            >
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#745A27" strokeWidth="2" strokeLinecap="round">
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
             </svg>
           ) : (
@@ -125,11 +91,8 @@ export default function AuthPage() {
           {loading ? "Signing in…" : "Sign in with Google"}
         </button>
 
-        <p
-          className="mt-6 text-center text-[11px] leading-relaxed"
-          style={{ color: "#B5A898" }}
-        >
-          By signing in you agree to AURUM's terms of use.
+        <p className="mt-6 text-center text-[11px] leading-relaxed" style={{ color: "#B5A898" }}>
+          By signing in you agree to AURUM&apos;s terms of use.
           <br />
           Authorised personnel only.
         </p>

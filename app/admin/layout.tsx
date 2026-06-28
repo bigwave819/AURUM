@@ -1,16 +1,12 @@
+// app/admin/layout.tsx
 import Sidebar from "@/components/layout/sidebar";
-import { redirect } from "next/navigation";
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main className="grow p-8 bg-muted/20">
-        {children}
+      <main className="flex-1 overflow-y-auto" style={{ backgroundColor: "#FFF8F3" }}>
+        <div className="p-6 sm:p-8">{children}</div>
       </main>
     </div>
   );

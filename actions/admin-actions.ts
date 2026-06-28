@@ -9,6 +9,7 @@ import { watchSchema } from "@/lib/schemas/watch-schema"
 import { cloudinary } from "@/lib/cloudinary"
 import { profileSchema } from "@/lib/schemas/settings-schema";
 import { OrderStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 interface GetUsersParams {
   page?: number;
@@ -19,7 +20,7 @@ interface GetOrdersParams {
   page?: number;
   limit?: number;
   search?: string;
-  status?: OrderStatus | "ALL" ;
+  status?: OrderStatus | "ALL";
   sortBy?: "createdAt" | "totalAmount";
   sortOrder?: "asc" | "desc";
 }
@@ -449,13 +450,13 @@ export async function getAllOrders({
     ...(status !== "ALL" ? { status } : {}),
     ...(search
       ? {
-          user: {
-            OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { email: { contains: search, mode: "insensitive" } },
-            ],
-          },
-        }
+        user: {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { email: { contains: search, mode: "insensitive" } },
+          ],
+        },
+      }
       : {}),
   };
 
@@ -525,6 +526,10 @@ export async function getOrderById(id: string) {
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   await requireAdmin();
 
+  if (!Object.values(OrderStatus).includes(status)) {
+    return { success: false as const, error: "Invalid status value." };
+  }
+
   try {
     const order = await prisma.order.update({
       where: { id },
@@ -541,5 +546,105 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
     }
     console.error("Failed to update order status:", error);
     return { success: false as const, error: "Something went wrong while updating the order." };
+  }
+}
+
+export async function getDashboardData() {
+  await requireAdmin();
+
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [
+      totalRevenueResult,
+      totalOrders,
+      pendingOrders,
+      deliveredOrders,
+      totalCustomers,
+      totalWatches,
+      recentOrders,
+      recentOrdersForChart,
+      recentCustomers,
+      topWatchItems,
+    ] = await Promise.all([
+      prisma.order.aggregate({ _sum: { totalAmount: true } }),
+      prisma.order.count(),
+      prisma.order.count({ where: { status: "PENDING" } }),
+      prisma.order.count({ where: { status: "DELIVERED" } }),
+      prisma.user.count({ where: { role: "user" } }),
+      prisma.watch.count(),
+      prisma.order.findMany({
+        take: 6,
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { name: true, email: true, image: true } } },
+      }),
+      prisma.order.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { totalAmount: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.user.findMany({
+        where: { role: "user" },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        select: { id: true, name: true, email: true, image: true, createdAt: true },
+      }),
+      prisma.orderItem.groupBy({
+        by: ["watchId"],
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: "desc" } },
+        take: 5,
+      }),
+    ]);
+
+    // Resolve watch details for the top-sellers groupBy result
+    const topWatchIds = topWatchItems.map((item) => item.watchId);
+    const topWatchDetails = await prisma.watch.findMany({
+      where: { id: { in: topWatchIds } },
+      select: { id: true, name: true, image: true, price: true, brand: { select: { name: true } } },
+    });
+
+    const topWatches = topWatchItems.map((item) => {
+      const watch = topWatchDetails.find((w) => w.id === item.watchId)!;
+      return { ...watch, unitsSold: item._sum.quantity ?? 0 };
+    });
+
+    // Bucket revenue by day for the chart
+    const revenueByDay = new Map<string, number>();
+    for (let i = 0; i < 30; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const key = date.toISOString().split("T")[0];
+      revenueByDay.set(key, 0);
+    }
+    recentOrdersForChart.forEach((order) => {
+      const key = order.createdAt.toISOString().split("T")[0];
+      if (revenueByDay.has(key)) {
+        revenueByDay.set(key, (revenueByDay.get(key) ?? 0) + order.totalAmount);
+      }
+    });
+    const chartData = Array.from(revenueByDay.entries())
+      .reverse()
+      .map(([date, revenue]) => ({ date, revenue }));
+
+    return {
+      success: true as const,
+      data: {
+        totalRevenue: totalRevenueResult._sum.totalAmount ?? 0,
+        totalOrders,
+        pendingOrders,
+        deliveredOrders,
+        totalCustomers,
+        totalWatches,
+        recentOrders,
+        recentCustomers,
+        topWatches,
+        chartData,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to fetch dashboard data:", error);
+    return { success: false as const, error: "Something went wrong while loading the dashboard." };
   }
 }

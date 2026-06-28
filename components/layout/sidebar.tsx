@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Clock,
@@ -10,20 +10,45 @@ import {
   Users,
   Settings,
   ChevronLeft,
+  LogOut,
 } from "lucide-react";
+import { useState } from "react";
 import { useSidebarStore } from "@/store/sidebar-store";
+import { useSession, authClient } from "@/lib/auth-client";
 
 const links = [
-  { id: 1, name: "Dashboard", path: "/admin/dashboard",  icon: LayoutDashboard },
-  { id: 2, name: "Watches",   path: "/admin/watches",    icon: Clock           },
-  { id: 3, name: "Orders",    path: "/admin/orders",     icon: ShoppingBag     },
-  { id: 4, name: "Customers", path: "/admin/customers",  icon: Users           },
-  { id: 5, name: "Settings",  path: "/admin/settings",   icon: Settings        },
+  { id: 1, name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
+  { id: 2, name: "Watches", path: "/admin/watches", icon: Clock },
+  { id: 3, name: "Orders", path: "/admin/orders", icon: ShoppingBag },
+  { id: 4, name: "Customers", path: "/admin/customers", icon: Users },
+  { id: 5, name: "Settings", path: "/admin/settings", icon: Settings },
 ];
+
+function getInitials(name: string) {
+  return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { collapsed, toggle } = useSidebarStore();
+  const { data: session } = useSession();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await authClient.signOut();
+      router.push("/auth");
+      router.refresh();
+    } catch (error) {
+      console.error("Sign out failed", error);
+      setSigningOut(false);
+    }
+  }
+
+  const userName = session?.user?.name ?? "Admin";
 
   return (
     <aside
@@ -52,8 +77,8 @@ export default function Sidebar() {
           aria-label="Toggle sidebar"
           className="w-7 h-7 flex items-center justify-center rounded-lg shrink-0 transition-transform duration-250"
           style={{ color: "#4D463A" }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#F0E9DF")}
-          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#F0E9DF")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
           <ChevronLeft
             size={17}
@@ -77,13 +102,13 @@ export default function Sidebar() {
                 backgroundColor: active ? "#F5EDE3" : "transparent",
                 borderLeftColor: !collapsed ? (active ? "#745A27" : "transparent") : undefined,
               }}
-              onMouseEnter={e => {
+              onMouseEnter={(e) => {
                 if (!active) {
                   (e.currentTarget as HTMLElement).style.backgroundColor = "#F0E9DF";
                   (e.currentTarget as HTMLElement).style.color = "#745A27";
                 }
               }}
-              onMouseLeave={e => {
+              onMouseLeave={(e) => {
                 if (!active) {
                   (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
                   (e.currentTarget as HTMLElement).style.color = "#4D463A";
@@ -97,23 +122,21 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom: user */}
-      <div className="px-2.5 py-3" style={{ borderTop: "0.5px solid #E8DDD0" }}>
+      {/* Bottom: user + logout */}
+      <div className="px-2.5 py-3 flex flex-col gap-1" style={{ borderTop: "0.5px solid #E8DDD0" }}>
         <div
-          className={`flex items-center gap-2.5 rounded-lg p-2 cursor-pointer transition-colors duration-150 ${collapsed ? "justify-center" : ""}`}
-          onMouseEnter={e => (e.currentTarget.style.background = "#F0E9DF")}
-          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          className={`flex items-center gap-2.5 rounded-lg p-2 ${collapsed ? "justify-center" : ""}`}
         >
           <div
             className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0"
             style={{ backgroundColor: "#745A27", color: "#FFF8F3" }}
           >
-            HG
+            {getInitials(userName)}
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <p className="text-xs font-medium whitespace-nowrap" style={{ color: "#3A2F22" }}>
-                Hirwa
+              <p className="text-xs font-medium whitespace-nowrap truncate" style={{ color: "#3A2F22" }}>
+                {userName}
               </p>
               <p className="text-[11px] whitespace-nowrap" style={{ color: "#9E9185" }}>
                 Admin
@@ -121,6 +144,19 @@ export default function Sidebar() {
             </div>
           )}
         </div>
+
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className={`flex items-center gap-3 rounded-lg text-[13px] font-medium transition-colors duration-150 disabled:opacity-60
+            ${collapsed ? "justify-center px-0 py-2.5" : "px-2.5 py-2.5"}`}
+          style={{ color: "#A32D2D" }}
+          aria-label={signingOut ? "Signing out" : "Sign out"}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#FCEBEB")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+        >
+          <LogOut size={16} className="shrink-0" />
+          {!collapsed && <span>{signingOut ? "Signing out…" : "Sign out"}</span>}        </button>
       </div>
     </aside>
   );

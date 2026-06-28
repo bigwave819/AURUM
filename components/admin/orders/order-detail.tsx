@@ -99,7 +99,7 @@ export function OrderDetail({ order }: OrderDetailProps) {
             style={{ borderBottom: i < order.items.length - 1 ? "0.5px solid #E8DDD0" : "none" }}
           >
             <div
-              className="relative w-14 h-14 rounded-md overflow-hidden flex-shrink-0"
+              className="relative w-14 h-14 rounded-md overflow-hidden shrink-0"
               style={{ backgroundColor: "#F5EDE3" }}
             >
               <Image src={item.watch.image} alt={item.watch.name} fill className="object-cover" />
